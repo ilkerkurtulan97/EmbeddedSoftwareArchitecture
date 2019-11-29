@@ -10,6 +10,7 @@
 #*****************************************************************************
 
 #------------------------------------------------------------------------------
+# Author : ILKER KURTULAN - Yasar Universty
 # Assignment 2 : Introduction to Embedded Software
 #
 # Use: make [TARGET] [PLATFORM-OVERRIDES]
@@ -23,73 +24,84 @@
 #------------------------------------------------------------------------------
 include sources.mk
 
-ifeq ($(PLATFORM),HOST)
-	CC = -DHOST
-else
-	CC = -T msp432p401r.lds
-endifd
+#
+# Use: make [TARGET] [PLATFORM-OVERRIDES]
+#
+# Build Targets:
+#      <FILE>.i - Generates preprocessed output of implementation file
+#      <FILE>.asm - Generates assembly output and final output executable 
+#                   of implementation files
+#      <FILE>.o - Generates the object file of source files
+#      all - Compiles all object files whitout linking
+#      build - Compiles and links all object files into final executable
+#      clean - Removes all generated files
+#
+# Platform Overrides:
+#      <Put a description of the supported Overrides here
+#
+#------------------------------------------------------------------------------
+include sources.mk
 
 # Platform Overrides
-PLATFORM = 
+PLATFORM = HOST
 
 # Architectures Specific Flags
-LINKER_FILE = 
-CPU = 
+LINKER_FILE = msp432p401r.lds
+CPU = cortex-m4
 ARCH = 
-SPECS = 
+SPECS = nosys.specs
 
 # Compiler Flags and Defines
-MSP432 = -T msp432p401r.lds
-Target = -DHOST
-CC = 
-LD = 
-LDFLAGS = 
-CFLAGS = 
-CPPFLAGs =
-W = -Wall
+CC = gcc
+LD = ld
+LDFLAGS = -Wl,-Map=$(TARGET).map
+CFLAGS = -g -Wall -Werror -std=c99 -O0 -DHOST -DCOURSE1 -DVERBOSE
+CPPFLAGS = $(INCLUDES)
+TARGET = c1m2
 
+OBJSO = $(SOURCES:.c=.o)
+OBJSI = $(SOURCES:.c=.i)
+OBJSASM = $(SOURCES:.c=.asm)
+OBJSS = $(SOURCES:.c=.s)
 
-
-#Varaible decleraction
-
-USE_NANO = --specs=nano.specs
-CC=arm-none-eabi-gcc
-
-
-#make all section will execute our default operation
-.PHONY : compile-all
-compile-all:
-	gcc -c main.c memory.c
+ifeq ($(PLATFORM),MSP432)
+	CC = arm-none-eabi-gcc
+	LD = arm-none-eabi-ld
+	LDFLAGS = -O0 -T $(LINKER_FILE) -DMSP432
+	CFLAGS = -g -Wall -Werror -std=c99 -mcpu=$(CPU) -mthumb \
+		-march=armv7e-m -mfloat-abi=hard -mfpu=fpv4-sp-d16 \
+		--specs=$(SPECS)
 	
+else 
+	CC = gcc
+	LD = ld
+	LDFLAGS = -Wl,-Map=$(TARGET).map
+	CFLAGS = -g -Wall -Werror -std=c99 -O0 -DHOST -DCOURSE1 -DVERBOSE
+endif
 
-#In this part ,the native compiler or the msp432 will be executed.
+%.o: %.c
+	$(CC) -c $< $(CFLAGS) $(LDFLAGS) $(CPPFLAGS) -o $@
+
+$(TARGET).out: $(OBJSO)
+	$(CC) $(OBJSO) $(CFLAGS) $(LDFLAGS) -o $@
+
+%.i: %.c
+	$(CC) -E $< $(CFLAGS) $(LDFLAGS) $(CPPFLAGS) -o $@
 	
-memory.o PLATFORM=MSP432:
-	$(CC) main.c -o c1m2.out
-	./c1m2.out
+%.asm: %.c $(TARGET).out
+	$(CC) -S $< $(CFLAGS) $(CPPFLAGS) -o $@
+	objdump -d -M intel -S $(TARGET).out > $(TARGET).asm 
+ 
+.PHONY: compile-all
+compile-all: $(SOURCES)
+	$(CC) -c $(SOURCES) $(CFLAGS) $(LDFLAGS) $(CPPFLAGS)
 
-build PLAFTORM=HOST:
-	gcc -o c1m2.out main.c
-	./c1m2.out
+.PHONY: build
+build: $(TARGET).out
 
-main.asm PLATFORM=HOST:
-	
-memory.i PLATFORM=HOST:
-
-%.i:
-	gcc -E c1m2 main.c
-	
-%.asm:
-	gcc -S c1m2 main.c
-	
-%.o:
-	gcc -o c1m2 main.c
-
-
-.PHONY : build
-build:
-	gcc -o c1m2 main.o memory.o
-
-
+.PHONY: clean
+clean:
+	rm -f $(OBJSO) $(OBJSI) $(OBJSASM) $(TARGET).out $(TARGET).o \
+	$(TARGET).i $(TARGET).asm $(TARGET).map
 
 
